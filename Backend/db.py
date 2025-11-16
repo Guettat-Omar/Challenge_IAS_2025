@@ -49,17 +49,16 @@ def insert_reading(data: dict):
 
 
 def get_last_n_minutes(n: int):
-    """Return last N co_mean values (for STEL/TWA)."""
+    """Fetch the last n co_mean values for STEL/TWA."""
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT co_mean 
-        FROM readings
+        SELECT co_mean FROM readings
         ORDER BY id DESC
         LIMIT ?
     """, (n,))
 
-    rows = cur.fetchall()
+    values = [row[0] for row in cur.fetchall()]
     conn.close()
-    return [r[0] for r in rows]  # list of floats
+    return values
