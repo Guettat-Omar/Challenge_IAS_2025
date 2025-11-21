@@ -1,8 +1,8 @@
 import sqlite3
-from config import SENSOR_DB_PATH
+from app.config.config import SENSOR_DB_PATH
 
 
-def init_db():
+def init_sensor_db():
     conn = sqlite3.connect(SENSOR_DB_PATH)
     cur = conn.cursor()
 
@@ -24,8 +24,7 @@ def init_db():
     conn.close()
 
 
-def insert_reading(data: dict):
-    """Insert raw sensor values into sensor_readings table."""
+def insert_sensor_reading(r):
     conn = sqlite3.connect(SENSOR_DB_PATH)
     cur = conn.cursor()
 
@@ -34,14 +33,10 @@ def insert_reading(data: dict):
         (timestamp, temp, pressure, co_mean, co_max, co_valid, pm2_5, pm10)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, (
-        data["timestamp"],
-        data["temp"],
-        data["pressure"],
-        data["co_mean"],
-        data["co_max"],
-        1 if data["co_valid"] else 0,
-        data["pm2_5"],
-        data["pm10"]
+        r["timestamp"], r["temp"], r["pressure"],
+        r["co_mean"], r["co_max"],
+        1 if r["co_valid"] else 0,
+        r["pm2_5"], r["pm10"]
     ))
 
     conn.commit()
