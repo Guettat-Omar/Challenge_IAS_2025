@@ -64,23 +64,34 @@ def _get_latest_comax(conn_sensor, end_ts):
     row = cur.fetchone()
     return row[0] if row else None
 
-
 def update_co_metrics(last_timestamp: str):
+    """
+    Computes and stores CO metrics (TWA, STEL, CEILING).
+    Returns the three values so co_alerts.py can evaluate alerts.
+    """
     conn_sensor = get_sensor_conn()
 
-    # TWA 8 hours
-    twa = _compute_window_avg(conn_sensor, last_timestamp, 480)
-    if twa is not None:
-        _insert_metric(last_timestamp, "TWA", twa, "8h", CO_TWA_LIMIT, twa <= CO_TWA_LIMIT)
+    # --- Compute metrics ---
+    twa_value = _compute_window_avg(conn_sensor, last_timestamp, minutes=480)
+    stel_value = _compute_window_avg(conn_sensor, last_timestamp, minutes=15)
+    ceiling_value = _get_latest_comax(conn_sensor, last_timestamp)
 
-    # STEL 15 minutes
-    stel = _compute_window_avg(conn_sensor, last_timestamp, 15)
-    if stel is not None:
-        _insert_metric(last_timestamp, "STEL", stel, "15min", CO_STEL_LIMIT, stel <= CO_STEL_LIMIT)
+    # --- Store metrics in co_metrics table ---
+    if twa_value is not None:
+        _insert_metric(last_timestamp, "TWA", twa_value, "8h", CO_TWA_LIMIT, twa_value <= CO_TWA_LIMIT)
 
-    # CEILING (instant)
-    ceil_val = _get_latest_comax(conn_sensor, last_timestamp)
-    if ceil_val is not None:
-        _insert_metric(last_timestamp, "CEILING", ceil_val, "instant", CO_CEILING_LIMIT, ceil_val <= CO_CEILING_LIMIT)
+    if stel_value is not None:
+        _insert_metric(last_timestamp, "STEL", stel_value, "15min", CO_STEL_LIMIT, stel_value <= CO_STEL_LIMIT)
+
+    if ceiling_value is not None:
+        _insert_metric(last_timestamp, "CEILING", ceiling_value, "instant", CO_CEILING_LIMIT, ceiling_value <= CO_CEILING_LIMIT)
 
     conn_sensor.close()
+
+    # Return metrics to alert module
+    return {
+        "twa": twa_value,
+        "stel": stel_value,
+        "ceiling": ceiling_value
+    }
+

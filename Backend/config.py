@@ -15,3 +15,21 @@ CO_TWA_LIMIT     = 50.0      # ppm, 8h average
 MQTT_SERVER = "broker.hivemq.com"
 MQTT_PORT   = 1883
 MQTT_TOPIC  = "omar/factory/sensors"
+
+# ---- PM2.5 RANGES (DSM501A realistic) ----
+# Values in µg/m³
+PM25_THRESHOLDS = [
+    ("green",    0.0,   15.0),
+    ("yellow",   15.0,  30.0),
+    ("orange",   30.0,  60.0),
+    ("red",      60.0, 100.0),
+    ("dark_red", 100.0, float("inf")),
+]
+# ---- PM10 RANGES (DSM501A realistic) ----
+PM10_THRESHOLDS = [
+    ("green",    0.0,   40.0),
+    ("yellow",   40.0,  80.0),
+    ("orange",   80.0, 120.0),
+    ("red",      120.0,150.0),
+    ("dark_red", 150.0,float("inf")),
+]
