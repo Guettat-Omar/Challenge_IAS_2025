@@ -1,5 +1,3 @@
-# models.py
-
 def validate_payload(data):
     required = [
         "timestamp", "temp", "pressure",

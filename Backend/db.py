@@ -1,15 +1,13 @@
-# db.py
-
 import sqlite3
-from config import DB_NAME
+from config import SENSOR_DB_PATH
 
 
 def init_db():
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(SENSOR_DB_PATH)
     cur = conn.cursor()
 
     cur.execute("""
-        CREATE TABLE IF NOT EXISTS readings (
+        CREATE TABLE IF NOT EXISTS sensor_readings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp TEXT,
             temp REAL,
@@ -27,11 +25,13 @@ def init_db():
 
 
 def insert_reading(data: dict):
-    conn = sqlite3.connect(DB_NAME)
+    """Insert raw sensor values into sensor_readings table."""
+    conn = sqlite3.connect(SENSOR_DB_PATH)
     cur = conn.cursor()
 
     cur.execute("""
-        INSERT INTO readings (timestamp, temp, pressure, co_mean, co_max, co_valid, pm2_5, pm10)
+        INSERT INTO sensor_readings
+        (timestamp, temp, pressure, co_mean, co_max, co_valid, pm2_5, pm10)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         data["timestamp"],
@@ -46,19 +46,3 @@ def insert_reading(data: dict):
 
     conn.commit()
     conn.close()
-
-
-def get_last_n_minutes(n: int):
-    """Fetch the last n co_mean values for STEL/TWA."""
-    conn = sqlite3.connect(DB_NAME)
-    cur = conn.cursor()
-
-    cur.execute("""
-        SELECT co_mean FROM readings
-        ORDER BY id DESC
-        LIMIT ?
-    """, (n,))
-
-    values = [row[0] for row in cur.fetchall()]
-    conn.close()
-    return values
