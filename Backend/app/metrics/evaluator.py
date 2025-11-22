@@ -1,6 +1,12 @@
 from app.metrics.co_metrics import compute_co_ceiling
 from app.metrics.pm_metrics import process_pm_metrics
-from app.metrics.temp_pressure_wbgt import compute_wbgt, classify_temp, classify_pressure, classify_wbgt
+from app.metrics.temp_pressure_wbgt import (
+    compute_wbgt,
+    classify_temp,
+    classify_pressure,
+    classify_wbgt,
+    build_environment_alert,
+)
 from app.metrics.co_alerts import process_co_alerts
 
 
@@ -20,6 +26,15 @@ def evaluate_all_metrics(reading):
     # PM Metrics
     # -------------------------
     pm = process_pm_metrics(ts, reading["pm2_5"], reading["pm10"])
+    for key, metric in pm.items():
+        metrics.append({
+            "timestamp": ts,
+            "type": f"{key.upper()}_LEVEL",
+            "value": metric["value"],
+            "window": "instant",
+            "limit": metric["high"],
+            "status": metric["level"],
+        })
     # Alerts are generated inside process_pm_metrics
 
     # -------------------------
@@ -70,6 +85,15 @@ def evaluate_all_metrics(reading):
         "limit": wbgt_lvl[2],
         "status": wbgt_lvl[0]
     })
+        # Add alerts for non-green levels
+    for alert in (
+        build_environment_alert("TEMP", ts, reading["temp"], temp_lvl),
+        build_environment_alert("PRESSURE", ts, reading["pressure"], pressure_lvl),
+        build_environment_alert("WBGT", ts, wbgt_val, wbgt_lvl),
+    ):
+        if alert:
+            alerts.append(alert)
+
 
     return {
         "metrics": metrics,
