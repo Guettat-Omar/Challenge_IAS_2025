@@ -65,11 +65,11 @@ PRESSURE_LIMITS = {
 }
 
 # WBGT
-WBGT_LIMITS = {
-    "green": (-273, 28),          # Normal
-    "yellow": (28, 30),           # Moderate heat stress
-    "orange": (30, 33),           # High heat stress
-    "red": (33, 35),              # Heat stroke risk
-    "dark-red": (35, 40),         # Extreme danger
-    "purple": (40, 100),          # Life-threatening
+WBGT_THRESHOLDS = {
+    "green": (0, 25),
+    "yellow": (25, 28),
+    "orange": (28, 31),
+    "red": (31, 33),
+    "dark_red": (33, 35),
+    "purple": (35, 100),
 }

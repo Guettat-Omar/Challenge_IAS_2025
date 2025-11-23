@@ -4,7 +4,7 @@ from app.metrics.temp_pressure_wbgt import (
     compute_wbgt,
     classify_temp,
     classify_pressure,
-    classify_wbgt,
+    process_wbgt,
     build_environment_alert,
 )
 from app.metrics.co_alerts import process_co_alerts
@@ -15,6 +15,7 @@ def evaluate_all_metrics(reading):
 
     metrics = []
     alerts = []
+    results = {}
 
     # -------------------------
     # CO Ceiling (instant)
@@ -56,7 +57,8 @@ def evaluate_all_metrics(reading):
 
     # WBGT  (approx)
     wbgt_val = compute_wbgt(reading["temp"])
-    wbgt_lvl = classify_wbgt(wbgt_val)
+    wbgt_status = process_wbgt(ts, wbgt_val)
+    results["wbgt"] = wbgt_status
 
     # Add them as passive metrics (no alerts yet)
     metrics.append({
@@ -80,22 +82,31 @@ def evaluate_all_metrics(reading):
     metrics.append({
         "timestamp": ts,
         "type": "WBGT",
-        "value": wbgt_val,
+        "value": wbgt_status["value"],
         "window": "instant",
-        "limit": wbgt_lvl[2],
-        "status": wbgt_lvl[0]
+        "limit": wbgt_status["range"][1],
+        "status": wbgt_status["level"]
     })
         # Add alerts for non-green levels
     for alert in (
         build_environment_alert("TEMP", ts, reading["temp"], temp_lvl),
         build_environment_alert("PRESSURE", ts, reading["pressure"], pressure_lvl),
-        build_environment_alert("WBGT", ts, wbgt_val, wbgt_lvl),
     ):
         if alert:
             alerts.append(alert)
+        if wbgt_status["level"] not in ("green", "yellow"):
+            alerts.append({
+                "timestamp": ts,
+                "category": "WBGT",
+                "value": wbgt_status["value"],
+                "limit": wbgt_status["range"][1],
+                "severity": "warning" if wbgt_status["level"] == "orange" else "critical",
+                "message": f"WBGT={wbgt_status['value']:.1f}°C → {wbgt_status['level'].upper()} risk level",
+        })
 
 
     return {
         "metrics": metrics,
-        "alerts": alerts
+        "alerts": alerts,
+        "results": results,
     }
