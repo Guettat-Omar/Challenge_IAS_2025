@@ -3,7 +3,7 @@ import math
 from app.config.thresholds import TEMP_LIMITS, PRESSURE_LIMITS, WBGT_THRESHOLDS
 from app.db.alerts_db import insert_alert
 
-def estimate_wet_bulb(temp_c: float, humidity: float = 10000) -> float:
+def estimate_wet_bulb(temp_c: float, humidity: float = 40) -> float:
     """Estimate wet-bulb temperature using Stull approximation (2011).
 
     Defaults to 40% RH as a stand-in when no humidity sensor is present.
