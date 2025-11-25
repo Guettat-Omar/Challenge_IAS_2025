@@ -3,7 +3,10 @@ import math
 from app.config.thresholds import TEMP_LIMITS, PRESSURE_LIMITS, WBGT_THRESHOLDS
 from app.db.alerts_db import insert_alert
 
-def estimate_wet_bulb(temp_c: float, humidity: float = 40) -> float:
+DEFAULT_WBGT_RH = 40
+
+
+def estimate_wet_bulb(temp_c: float, humidity: float = DEFAULT_WBGT_RH) -> float:
     """Estimate wet-bulb temperature using Stull approximation (2011).
 
     Defaults to 40% RH as a stand-in when no humidity sensor is present.
@@ -21,8 +24,12 @@ def estimate_wet_bulb(temp_c: float, humidity: float = 40) -> float:
     )
 
 
-def compute_wbgt(temp_c: float, humidity: float = 40) -> float:
-    """Approximate WBGT using wet-bulb estimate and dry-bulb temperature."""
+def compute_wbgt(temp_c: float, humidity: float = DEFAULT_WBGT_RH) -> float:
+    """Approximate WBGT using wet-bulb estimate and dry-bulb temperature.
+
+    When no humidity reading is provided, a 40% default is used to match the
+    agreed-upon baseline for environments without a dedicated humidity sensor.
+    """
 
     twb = estimate_wet_bulb(temp_c, humidity)
     return 0.7 * twb + 0.3 * temp_c
@@ -45,12 +52,25 @@ def _level_to_severity(level: str):
         "yellow": "warning",
         "yellow-low": "warning",
         "yellow-high": "warning",
+        "orange-low": "warning",
+        "orange-high": "warning",
         "orange": "warning",
+        "red-low": "high",
+        "red-high": "high",
         "red": "high",
+        "dark-red-low": "critical",
+        "dark-red-high": "critical",
         "dark-red": "critical",
         "dark_red": "critical",
+        "purple-low": "critical",
+        "purple-high": "critical",
         "purple": "critical",
     }.get(level, "none")
+
+def level_to_severity(level: str) -> str:
+    """Public wrapper for mapping band names to severity strings."""
+
+    return _level_to_severity(level)
 
 
 def classify_temp(temp):
@@ -67,21 +87,31 @@ def classify_wbgt(w):
 def process_wbgt(timestamp, wbgt_value):
     level, low, high = classify_wbgt(wbgt_value)
 
-    if level not in ("green", "yellow"):
-        insert_alert({
+    alert = None
+    severity = wbgt_level_to_severity(level)
+    if severity != "none":
+        alert = {
             "timestamp": timestamp,
             "category": "WBGT",
             "value": wbgt_value,
             "limit": high,
-            "severity": "warning" if level == "orange" else "critical",
+            "severity": severity,
             "message": f"WBGT={wbgt_value:.1f}°C → {level.upper()} risk level",
-        })
+        }
 
     return {
         "value": wbgt_value,
         "level": level,
         "range": (low, high),
-    }
+    }, alert
+
+
+def wbgt_level_to_severity(level: str) -> str:
+    if level in ("green", "yellow", "unknown"):
+        return "none"
+    if level == "orange":
+        return "warning"
+    return "critical"
 
 def build_environment_alert(category: str, timestamp: str, value: float, level_data):
     level, low, high = level_data

@@ -6,6 +6,8 @@ from app.db.sensor_db import insert_sensor_reading
 from app.metrics.evaluator import evaluate_all_metrics
 from app.db.metrics_db import insert_metric_record
 from app.db.alerts_db import insert_alert_record
+from app.db.ventilation_db import insert_ventilation_record
+from app.hvac.hvac_controller import decide_hvac_actions
 from app.config.config import MQTT_SERVER, MQTT_PORT, MQTT_TOPIC
 
 
@@ -27,7 +29,7 @@ def on_message(client, userdata, msg):
             insert_alert_record(a)
 
         print("\n📥 Received:", reading)
-        print("📊 Stored metrics & alerts.")
+        print("📊 Stored metrics, alerts, and ventilation actions.")
 
     except Exception as e:
         print("❌ Error:", e)

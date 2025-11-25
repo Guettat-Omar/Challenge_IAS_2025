@@ -1,14 +1,29 @@
 from app.metrics.co_metrics import compute_co_ceiling
 from app.metrics.pm_metrics import process_pm_metrics
+from app.config.thresholds import CO_LIMITS
 from app.metrics.temp_pressure_wbgt import (
-    compute_wbgt,
-    classify_temp,
-    classify_pressure,
-    process_wbgt,
     build_environment_alert,
+    classify_pressure,
+    classify_temp,
+    compute_wbgt,
+    level_to_severity,
+    process_wbgt,
+    wbgt_level_to_severity,
 )
 from app.metrics.co_alerts import process_co_alerts
 
+def _classify_from_limits(value, limits):
+    if isinstance(limits, dict):
+        thresholds = sorted(limits.items(), key=lambda item: item[1][0])
+        for level, (low, high) in thresholds:
+            if low <= value < high:
+                return level, low, high
+    else:
+        for level, low, high in limits:
+            if low <= value < high:
+                return level, low, high
+
+    return "unknown", None, None
 
 def evaluate_all_metrics(reading):
     ts = reading["timestamp"]
@@ -16,12 +31,20 @@ def evaluate_all_metrics(reading):
     metrics = []
     alerts = []
     results = {}
+    status_packet = {"timestamp": ts}
 
     # -------------------------
     # CO Ceiling (instant)
     # -------------------------
     co_ceiling_m = compute_co_ceiling(ts, reading["co_max"])
     metrics.append(co_ceiling_m)
+    co_level = _classify_from_limits(reading["co_max"], CO_LIMITS)
+    co_status = {
+        "value": reading["co_max"],
+        "level": co_level[0],
+        "severity": level_to_severity(co_level[0]),
+    }
+    results["co"] = co_status
 
     # -------------------------
     # PM Metrics
@@ -57,8 +80,11 @@ def evaluate_all_metrics(reading):
 
     # WBGT  (approx)
     wbgt_val = compute_wbgt(reading["temp"])
-    wbgt_status = process_wbgt(ts, wbgt_val)
+    wbgt_status, wbgt_alert = process_wbgt(ts, wbgt_val)
     results["wbgt"] = wbgt_status
+    temp_severity = level_to_severity(temp_lvl[0])
+    pressure_severity = level_to_severity(pressure_lvl[0])
+    wbgt_severity = wbgt_level_to_severity(wbgt_status["level"])
 
     # Add them as passive metrics (no alerts yet)
     metrics.append({
@@ -87,23 +113,48 @@ def evaluate_all_metrics(reading):
         "limit": wbgt_status["range"][1],
         "status": wbgt_status["level"]
     })
-        # Add alerts for non-green levels
+    if wbgt_alert:
+        alerts.append(wbgt_alert)
+    # Add alerts for non-green levels
     for alert in (
         build_environment_alert("TEMP", ts, reading["temp"], temp_lvl),
         build_environment_alert("PRESSURE", ts, reading["pressure"], pressure_lvl),
     ):
         if alert:
             alerts.append(alert)
-        if wbgt_status["level"] not in ("green", "yellow"):
-            alerts.append({
-                "timestamp": ts,
-                "category": "WBGT",
+        status_packet.update(
+        {
+            "co": co_status,
+            "pm": {
+                "pm2_5": {
+                    "value": pm["pm2_5"]["value"],
+                    "level": pm["pm2_5"]["level"],
+                    "severity": pm["pm2_5"]["severity"],
+                },
+                "pm10": {
+                    "value": pm["pm10"]["value"],
+                    "level": pm["pm10"]["level"],
+                    "severity": pm["pm10"]["severity"],
+                },
+            },
+            "temp": {
+                "value": reading["temp"],
+                "level": temp_lvl[0],
+                "severity": temp_severity,
+            },
+            "wbgt": {
                 "value": wbgt_status["value"],
-                "limit": wbgt_status["range"][1],
-                "severity": "warning" if wbgt_status["level"] == "orange" else "critical",
-                "message": f"WBGT={wbgt_status['value']:.1f}°C → {wbgt_status['level'].upper()} risk level",
-        })
-
+                "level": wbgt_status["level"],
+                "severity": wbgt_severity,
+            },
+            "pressure": {
+                "value": reading["pressure"],
+                "level": pressure_lvl[0],
+                "severity": pressure_severity,
+            },
+        }
+    )
+    results["status_packet"] = status_packet
 
     return {
         "metrics": metrics,
