@@ -21,7 +21,7 @@ Severity:  "none", "warning", "high", "critical"
 """
 
 from typing import Any, Dict
-
+from datetime import datetime, timezone
 
 def _clamp_percent(x: int) -> int:
     """Clamp fan/AC values into [0, 100]."""
@@ -44,6 +44,8 @@ def decide_hvac_actions(status_packet: Dict[str, Any]) -> Dict[str, Any]:
 
     # ---- Default "normal" mode ----
     actions = {
+        "timestamp": status_packet.get("timestamp")
+        or datetime.now(timezone.utc).isoformat(),
         "ventilation_mode": "NORMAL",
         "fan_supply_speed": 40,
         "fan_exhaust_speed": 30,

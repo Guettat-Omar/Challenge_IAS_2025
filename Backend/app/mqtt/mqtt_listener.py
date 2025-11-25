@@ -8,7 +8,7 @@ from app.db.metrics_db import insert_metric_record
 from app.db.alerts_db import insert_alert_record
 from app.db.ventilation_db import insert_ventilation_record
 from app.hvac.hvac_controller import decide_hvac_actions
-from app.config.config import MQTT_SERVER, MQTT_PORT, MQTT_TOPIC
+from app.config.config import MQTT_SERVER, MQTT_PORT, MQTT_TOPIC, MQTT_VENTILATION_TOPIC
 
 
 def on_message(client, userdata, msg):
@@ -28,8 +28,18 @@ def on_message(client, userdata, msg):
         for a in results["alerts"]:
             insert_alert_record(a)
 
+        status_packet = results["results"]["status_packet"]
+        ventilation_actions = decide_hvac_actions(status_packet)
+        insert_ventilation_record(ventilation_actions)
+
+        publish_payload = dict(ventilation_actions)
+        publish_payload.pop("reasons", None)
+
+        client.publish(MQTT_VENTILATION_TOPIC, json.dumps(publish_payload))
+
         print("\n📥 Received:", reading)
         print("📊 Stored metrics, alerts, and ventilation actions.")
+        print(f"📡 Published ventilation commands : {publish_payload}")
 
     except Exception as e:
         print("❌ Error:", e)
