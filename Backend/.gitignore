@@ -38,3 +38,6 @@ desktop.ini
 # ----- Temporary -----
 tmp/
 temp/
+
+.venv
+.pytest_cache/
