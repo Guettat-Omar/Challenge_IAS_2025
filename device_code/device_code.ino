@@ -49,9 +49,23 @@ const char* password    = "1234567890";
 const char* mqtt_server = "broker.hivemq.com";
 const int   mqtt_port   = 1883;
 const char* mqtt_topic  = "omar/factory/sensors";
+const char* mqtt_control_topic = "omar/factory/ventilation";
+
 
 WiFiClient espClient;
 PubSubClient client(espClient);
+
+// =========================
+// FAN CONTROL (L298N)
+// =========================
+const int FAN_PWM = 15;   // ENA
+const int FAN_IN1 = 18;
+const int FAN_IN2 = 19;
+
+const int FAN_PWM_CH = 5;
+const int FAN_PWM_FREQ = 25000;
+const int FAN_PWM_RES = 8;
+
 
 void setupTime() {
   // Use NTP servers
@@ -228,8 +242,12 @@ void reconnectMQTT() {
 
     if (client.connect("ESP32_AirMonitor")) {
       Serial.println("connected.");
-    } 
-    else {
+
+      // SUBSCRIBE HERE — ONLY ON SUCCESSFUL CONNECT
+      client.subscribe(mqtt_control_topic);
+      Serial.println("Subscribed to: omar/factory/ventilation/control");
+
+    } else {
       Serial.print("failed (");
       Serial.print(client.state());
       Serial.println("). Retry in 2 seconds...");
@@ -237,6 +255,53 @@ void reconnectMQTT() {
     }
   }
 }
+
+
+int percentToPWM(int percent) {
+  if (percent < 0) percent = 0;
+  if (percent > 100) percent = 100;
+  return (percent * 255) / 100;
+}
+
+void setFanSpeed(int percent) {
+  int pwmValue = percentToPWM(percent);
+  ledcWrite(FAN_PWM_CH, pwmValue);
+
+  Serial.print("⚙ FAN speed set to ");
+  Serial.print(percent);
+  Serial.print("% → PWM ");
+  Serial.println(pwmValue);
+}
+
+void mqttCallback(char* topic, byte* message, unsigned int length) {
+
+  Serial.print("\n📥 MQTT Message received on: ");
+  Serial.println(topic);
+
+  if (strcmp(topic, mqtt_control_topic) != 0) {
+    Serial.println("Ignoring message from other topic.");
+    return;
+  }
+
+  // Convert payload to string
+  String payload;
+  for (unsigned int i = 0; i < length; i++)
+    payload += (char)message[i];
+
+  Serial.println("Payload: " + payload);
+
+  // Extract fan speed
+  int keyIndex = payload.indexOf("\"fan_supply_speed\":");
+  if (keyIndex != -1) {
+    int start = payload.indexOf(":", keyIndex) + 1;
+    int end = payload.indexOf(",", start);
+    if (end == -1) end = payload.indexOf("}", start);
+
+    int speed = payload.substring(start, end).toInt();
+    setFanSpeed(speed);   // <-- FAN CONTROL HERE
+  }
+}
+
 
 
 
@@ -247,13 +312,27 @@ void setup() {
   setupWiFi();
   setupTime();
   client.setServer(mqtt_server, mqtt_port);
+  client.setCallback(mqttCallback);
 
 
   // MQ7 cycle start
   mq7CycleStart = millis();
 
+  pinMode(FAN_IN1, OUTPUT);
+  pinMode(FAN_IN2, OUTPUT);
+
+  // Fixed direction (supply fan)
+  digitalWrite(FAN_IN1, HIGH);
+  digitalWrite(FAN_IN2, LOW);
+
+  // PWM setup
+  ledcSetup(FAN_PWM_CH, FAN_PWM_FREQ, FAN_PWM_RES);
+  ledcAttachPin(FAN_PWM, FAN_PWM_CH);
+  ledcWrite(FAN_PWM_CH, 0);  // Fan OFF initially
+
+
   // DSM501A setup
-  pinMode(DSM_PIN, INPUT);
+  pinMode(DSM_PIN, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(DSM_PIN), dsm_isr, CHANGE);
   dsmWindowStart = millis();
 
