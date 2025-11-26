@@ -1,7 +1,7 @@
 # MQTT
 MQTT_SERVER = "broker.hivemq.com"
 MQTT_PORT = 1883
-MQTT_TOPIC = "omar/factory/sensors"
+MQTT_TOPIC = "omar/factory/sensors1"
 MQTT_VENTILATION_TOPIC = "omar/factory/ventilation"
 
 # DB paths
