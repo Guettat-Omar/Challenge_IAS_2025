@@ -37,7 +37,13 @@ def process_pm_metrics(timestamp, pm25, pm10):
 
     # PM2.5
     level25, sev25, low25, high25 = classify_pm25(pm25)
-    results["pm2_5"] = {"value": pm25, "level": level25, "severity": sev25}
+    results["pm2_5"] = {
+        "value": pm25,
+        "level": level25,
+        "severity": sev25,
+        "low": low25,
+        "high": high25,
+    }
     if sev25 != "none":
         insert_alert_record({
             "timestamp": timestamp,
@@ -50,7 +56,13 @@ def process_pm_metrics(timestamp, pm25, pm10):
 
     # PM10
     level10, sev10, low10, high10 = classify_pm10(pm10)
-    results["pm10"] = {"value": pm10, "level": level10, "severity": sev10}
+    results["pm10"] = {
+        "value": pm10,
+        "level": level10,
+        "severity": sev10,
+        "low": low10,
+        "high": high10,
+    }
     if sev10 != "none":
         insert_alert_record({
             "timestamp": timestamp,

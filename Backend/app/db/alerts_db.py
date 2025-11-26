@@ -36,3 +36,8 @@ def insert_alert_record(alert):
 
     conn.commit()
     conn.close()
+
+# Backward-compatible alias used by some call sites/documentation
+def insert_alert(alert):
+    """Insert an alert record (alias for insert_alert_record)."""
+    insert_alert_record(alert)
