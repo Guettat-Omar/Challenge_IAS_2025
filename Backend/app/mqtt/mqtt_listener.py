@@ -8,7 +8,34 @@ from app.db.metrics_db import insert_metric_record
 from app.db.alerts_db import insert_alert_record
 from app.db.ventilation_db import insert_ventilation_record
 from app.hvac.hvac_controller import decide_hvac_actions
-from app.config.config import MQTT_SERVER, MQTT_PORT, MQTT_TOPIC, MQTT_VENTILATION_TOPIC
+from app.config.config import (
+    MQTT_SERVER,
+    MQTT_PORT,
+    MQTT_TOPIC,
+    MQTT_UNITY_TOPIC,
+    MQTT_VENTILATION_TOPIC,
+)
+
+
+def _extract_color(level: str) -> str:
+    sanitized = (level or "").replace("_", "-")
+    return sanitized.split("-")[0] if "-" in sanitized else sanitized or "unknown"
+
+
+def build_unity_payload(status_packet):
+    return {
+        "timestamp": status_packet.get("timestamp"),
+        "co": _extract_color(status_packet.get("co", {}).get("level", "")),
+        "pm2_5": _extract_color(
+            status_packet.get("pm", {}).get("pm2_5", {}).get("level", "")
+        ),
+        "pm10": _extract_color(
+            status_packet.get("pm", {}).get("pm10", {}).get("level", "")
+        ),
+        "temp": _extract_color(status_packet.get("temp", {}).get("level", "")),
+        "wbgt": _extract_color(status_packet.get("wbgt", {}).get("level", "")),
+        "pressure": _extract_color(status_packet.get("pressure", {}).get("level", "")),
+    }
 
 
 def on_message(client, userdata, msg):
@@ -36,10 +63,13 @@ def on_message(client, userdata, msg):
         publish_payload.pop("reasons", None)
 
         client.publish(MQTT_VENTILATION_TOPIC, json.dumps(publish_payload))
+        unity_payload = build_unity_payload(status_packet)
+        client.publish(MQTT_UNITY_TOPIC, json.dumps(unity_payload))
 
         print("\n📥 Received:", reading)
         print("📊 Stored metrics, alerts, and ventilation actions.")
         print(f"📡 Published ventilation commands : {publish_payload}")
+        print(f"🎮 Sent Unity status payload: {unity_payload}")
 
     except Exception as e:
         print("❌ Error:", e)
