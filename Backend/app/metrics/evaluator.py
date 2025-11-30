@@ -1,6 +1,6 @@
 from app.metrics.co_metrics import compute_co_ceiling
 from app.metrics.pm_metrics import process_pm_metrics
-from app.config.thresholds import CO_LIMITS
+from app.config.thresholds import CO_LIMITS, CO2_LIMITS
 from app.metrics.temp_pressure_wbgt import (
     build_environment_alert,
     classify_pressure,
@@ -45,6 +45,16 @@ def evaluate_all_metrics(reading):
         "severity": level_to_severity(co_level[0]),
     }
     results["co"] = co_status
+
+    # -------------------------
+    # CO2 (air quality / ventilation)
+    # -------------------------
+    co2_level = _classify_from_limits(reading["co2"], CO2_LIMITS)
+    co2_status = {
+        "value": reading["co2"],
+        "level": co2_level[0],
+        "severity": level_to_severity(co2_level[0]),
+    }
 
     # -------------------------
     # PM Metrics
@@ -107,6 +117,15 @@ def evaluate_all_metrics(reading):
 
     metrics.append({
         "timestamp": ts,
+        "type": "CO2_LEVEL",
+        "value": reading["co2"],
+        "window": "instant",
+        "limit": co2_level[2],
+        "status": co2_level[0],
+    })
+
+    metrics.append({
+        "timestamp": ts,
         "type": "WBGT",
         "value": wbgt_status["value"],
         "window": "instant",
@@ -119,12 +138,14 @@ def evaluate_all_metrics(reading):
     for alert in (
         build_environment_alert("TEMP", ts, reading["temp"], temp_lvl),
         build_environment_alert("PRESSURE", ts, reading["pressure"], pressure_lvl),
+        build_environment_alert("CO2", ts, reading["co2"], co2_level),
     ):
         if alert:
             alerts.append(alert)
         status_packet.update(
         {
             "co": co_status,
+            "co2": co2_status,
             "pm": {
                 "pm2_5": {
                     "value": pm["pm2_5"]["value"],

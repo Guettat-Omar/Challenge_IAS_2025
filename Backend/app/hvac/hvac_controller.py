@@ -86,6 +86,24 @@ def decide_hvac_actions(status_packet: Dict[str, Any]) -> Dict[str, Any]:
         )
         # CO danger overrides all other conditions
         return _finalize_actions(actions)
+    
+    co2_severity = get(("co2", "severity"), "none")
+    co2_value = get(("co2", "value"), 0.0)
+    co2_level = get(("co2", "level"), "green")
+
+    if co2_severity in ("high", "critical"):
+        actions["ventilation_mode"] = "CO2_PURGE"
+        actions["fan_supply_speed"] = max(actions["fan_supply_speed"], 90)
+        actions["fan_exhaust_speed"] = max(actions["fan_exhaust_speed"], 75)
+        actions["reasons"].append(
+            f"CO2 {co2_level.upper()} ({co2_value:.0f} ppm) → increase fresh air"
+        )
+    elif co2_severity == "warning":
+        actions["fan_supply_speed"] = max(actions["fan_supply_speed"], 70)
+        actions["fan_exhaust_speed"] = max(actions["fan_exhaust_speed"], 55)
+        actions["reasons"].append(
+            f"CO2 warning ({co2_value:.0f} ppm) → boost ventilation"
+        )
 
     # ------------------------------------------------
     # 2) PM (Dust) — PM2.5 / PM10

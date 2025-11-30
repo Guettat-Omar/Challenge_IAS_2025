@@ -2,7 +2,7 @@ def validate_payload(d):
     required = [
         "timestamp", "temp", "pressure",
         "co_mean", "co_max", "co_valid",
-        "pm2_5", "pm10"
+        "pm2_5", "pm10", "co2"
     ]
 
     for r in required:
@@ -17,5 +17,6 @@ def validate_payload(d):
         "co_max": float(d["co_max"]),
         "co_valid": bool(d["co_valid"]),
         "pm2_5": float(d["pm2_5"]),
-        "pm10": float(d["pm10"])
+        "pm10": float(d["pm10"]),
+        "co2": float(d["co2"])
     }

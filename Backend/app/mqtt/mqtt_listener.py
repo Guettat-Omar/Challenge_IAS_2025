@@ -13,6 +13,7 @@ from app.config.config import (
     MQTT_PORT,
     MQTT_TOPIC,
     MQTT_UNITY_TOPIC,
+    MQTT_UNITY_ALERT_TOPIC,
     MQTT_VENTILATION_TOPIC,
 )
 
@@ -26,6 +27,7 @@ def build_unity_payload(status_packet):
     return {
         "timestamp": status_packet.get("timestamp"),
         "co": _extract_color(status_packet.get("co", {}).get("level", "")),
+        "co2": _extract_color(status_packet.get("co2", {}).get("level", "")),
         "pm2_5": _extract_color(
             status_packet.get("pm", {}).get("pm2_5", {}).get("level", "")
         ),
@@ -36,6 +38,57 @@ def build_unity_payload(status_packet):
         "wbgt": _extract_color(status_packet.get("wbgt", {}).get("level", "")),
         "pressure": _extract_color(status_packet.get("pressure", {}).get("level", "")),
     }
+
+def build_unity_alert_messages(status_packet):
+    ts = status_packet.get("timestamp")
+
+    severity_rank = {"none": 0, "warning": 1, "high": 2, "critical": 3}
+
+    def _append_if_active(messages, name, data):
+        if not data:
+            return
+
+        severity = data.get("severity", "none")
+        if severity not in {"warning", "high", "critical"}:
+            return
+
+        messages.append(
+            {
+                "gas": name,
+                "predicted_value": data.get("value"),
+                "level": severity,
+                "timestamp": ts,
+            }
+        )
+
+    alerts = []
+    pm = status_packet.get("pm", {})
+    _append_if_active(alerts, "co", status_packet.get("co"))
+    _append_if_active(alerts, "co2", status_packet.get("co2"))
+    _append_if_active(alerts, "pm2_5", pm.get("pm2_5"))
+    _append_if_active(alerts, "pm10", pm.get("pm10"))
+    _append_if_active(alerts, "temp", status_packet.get("temp"))
+    _append_if_active(alerts, "wbgt", status_packet.get("wbgt"))
+    _append_if_active(alerts, "pressure", status_packet.get("pressure"))
+
+    if not alerts:
+        return []
+
+    def _score(alert):
+        base = severity_rank.get(alert.get("level", "none"), 0)
+        value = alert.get("predicted_value")
+        return (base, value if isinstance(value, (int, float)) else float("-inf"))
+
+    worst = alerts[0]
+    worst_score = _score(worst)
+
+    for alert in alerts[1:]:
+        score = _score(alert)
+        if score > worst_score:
+            worst, worst_score = alert, score
+
+    return [worst]
+
 
 
 def on_message(client, userdata, msg):
@@ -66,10 +119,16 @@ def on_message(client, userdata, msg):
         unity_payload = build_unity_payload(status_packet)
         client.publish(MQTT_UNITY_TOPIC, json.dumps(unity_payload))
 
+        unity_alerts = build_unity_alert_messages(status_packet)
+        for alert_msg in unity_alerts:
+            client.publish(MQTT_UNITY_ALERT_TOPIC, json.dumps(alert_msg))
+
         print("\n📥 Received:", reading)
         print("📊 Stored metrics, alerts, and ventilation actions.")
         print(f"📡 Published ventilation commands : {publish_payload}")
         print(f"🎮 Sent Unity status payload: {unity_payload}")
+        if unity_alerts:
+            print(f"🚨 Sent Unity alert packets ({len(unity_alerts)}): {unity_alerts}")
 
     except Exception as e:
         print("❌ Error:", e)

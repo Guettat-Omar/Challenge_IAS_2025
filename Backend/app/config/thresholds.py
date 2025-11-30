@@ -56,8 +56,8 @@ PRESSURE_LIMITS = {
     "red-low": (850, 900),         # 85–90 kPa hazardous
     "orange-low": (900, 950),      # 90–95 kPa abnormal
     "yellow-low": (950, 980),      # 95–98 kPa slight deviation
-    "green": (980, 1020),          # 98–102 kPa normal
-    "yellow-high": (1020, 1050),   # 102–105 kPa slight deviation
+    "green": (980, 1030),          # 98–102 kPa normal
+    "yellow-high": (1030, 1050),   # 102–105 kPa slight deviation
     "orange-high": (1050, 1080),   # 105–108 kPa abnormal
     "red-high": (1080, 1100),      # 108–110 kPa hazardous
     "dark-red-high": (1100, 1150), # 110–115 kPa dangerous
